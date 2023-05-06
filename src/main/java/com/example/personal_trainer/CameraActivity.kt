@@ -1,243 +1,216 @@
 package com.example.personal_trainer
 
+import android.Manifest
 import android.annotation.SuppressLint
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.ImageFormat
-import android.hardware.camera2.CameraCaptureSession
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
+import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.media.Image
-import android.media.ImageReader
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
+import android.provider.MediaStore
 import android.util.Log
-import android.view.Surface
-import android.view.SurfaceHolder
-import android.view.SurfaceView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.example.personal_trainer.databinding.CameraActivityBinding
 import com.example.personal_trainer.ml.PersonalTrainerModel
-import org.tensorflow.lite.DataType
-import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.image.ImageProcessor
-import org.tensorflow.lite.support.image.ops.ResizeOp
-import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
-import java.io.IOException
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
-
-class CameraActivity: AppCompatActivity() {
-
-    lateinit var surfaceView: SurfaceView
+class CameraActivity : AppCompatActivity() {
+    // viewBinding = the whole layout
+    private lateinit var viewBinding: CameraActivityBinding
     lateinit var model: PersonalTrainerModel
-    lateinit var imageProcessor: ImageProcessor
-    lateinit var interpreter: Interpreter
-    val imageSize = 224;
+    private var imageCapture: ImageCapture? = null
 
-    val surfaceReadyCallback = object: SurfaceHolder.Callback {
+    private var videoCapture: VideoCapture<Recorder>? = null
+    private var recording: Recording? = null
+    private lateinit var classifier: Classifier
+    private lateinit var cameraExecutor: ExecutorService
 
-        override fun surfaceCreated(p0: SurfaceHolder) {
-            startCameraPreview()
-        }
-
-        override fun surfaceChanged(p0: SurfaceHolder, p1: Int, p2: Int, p3: Int) {
-            Log.d("Surface changed", "Surface changed")
-        }
-
-        override fun surfaceDestroyed(p0: SurfaceHolder) {
-            TODO("Not yet implemented")
-        }
-    }
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.camera_activity)
+        viewBinding = CameraActivityBinding.inflate(layoutInflater)
+        setContentView(viewBinding.root)
 
-        if (!CameraPermissionHelper.hasCameraPermission(this)) {
-            CameraPermissionHelper.requestCameraPermission(this)
-            return
+        // Request camera permissions
+        if (allPermissionsGranted()) {
+            model = PersonalTrainerModel.newInstance(applicationContext)
+            startCamera()
+        } else {
+            ActivityCompat.requestPermissions(
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
         }
-        surfaceView = findViewById(R.id.surfaceView)
-        surfaceView.holder.addCallback(surfaceReadyCallback)
 
-        imageProcessor = ImageProcessor.Builder().add(ResizeOp(224,224, ResizeOp.ResizeMethod.BILINEAR)).build()
-        model = PersonalTrainerModel.newInstance(applicationContext)
+        // Set up the listeners for take photo and video capture buttons
 
+        viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
+        viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        classifier = Classifier(applicationContext)
+    }
+
+    private fun takePhoto() {
+        // Get a stable reference of the modifiable image capture use case
+        val imageCapture = imageCapture ?: return
+
+        // Create time stamped name and MediaStore entry.
+        val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US)
+            .format(System.currentTimeMillis())
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
+            }
+        }
+
+        // Create output options object which contains file + metadata
+        val outputOptions = ImageCapture.OutputFileOptions
+            .Builder(
+                contentResolver,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues
+            )
+            .build()
+
+        // Set up image capture listener, which is triggered after photo has
+        // been taken
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                }
+
+                override fun
+                        onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val msg = "Photo capture succeeded: ${output.savedUri}"
+                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, msg)
+                }
+            }
+        )
+    }
+
+    private fun captureVideo() {}
+
+    private fun startCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        cameraProviderFuture.addListener({
+            // Used to bind the lifecycle of cameras to the lifecycle owner
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+
+            //  A use case that provides a camera preview stream for displaying on-screen.
+            val preview = Preview.Builder()
+                .build()
+                .also {
+                    //  provide a Surface for Preview.
+                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
+                }
+            //A use case for taking a picture.
+            imageCapture = ImageCapture.Builder().build()
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, FrameAnalyzer(classifier))
+                }
+            // Select back camera as a default
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                // Unbind use cases before rebinding
+                cameraProvider.unbindAll()
+
+                //Binds the collection of UseCase to a LifecycleOwner.
+                cameraProvider.bindToLifecycle(
+                    this, cameraSelector, preview, imageCapture, imageAnalyzer
+                )
+
+            } catch (exc: Exception) {
+                Log.e(TAG, "Use case binding failed", exc)
+            }
+
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(
+            baseContext, it
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onDestroy() {
-        model.close()
         super.onDestroy()
+        cameraExecutor.shutdown()
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    companion object {
+        private const val TAG = "CameraXApp"
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS =
+            mutableListOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.RECORD_AUDIO
+            ).apply {
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                    add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }.toTypedArray()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<String>, grantResults:
+        IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (!CameraPermissionHelper.hasCameraPermission(this)) {
-            Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
-            if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
-                // Permission denied with checking "Do not ask again".
-                CameraPermissionHelper.launchPermissionSettings(this)
-            }
-            finish()
-        }
-
-        recreate()
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun startCameraPreview() {
-
-        val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        if (cameraManager.cameraIdList.isEmpty()) {
-            // no cameras
-            return
-        }
-
-        val firstCameraId = cameraManager.cameraIdList[0]
-
-        // after getting the id we open the camera with id firstCameraId
-        // we have to override the methods
-        cameraManager.openCamera(firstCameraId, object: CameraDevice.StateCallback() {
-            override fun onDisconnected(p0: CameraDevice) { }
-            override fun onError(p0: CameraDevice, p1: Int) { }
-            override fun onOpened(cameraDevice: CameraDevice) {
-                // use the camera
-                // . If you wanted to be more particular about which camera to use,
-                // you could call getCameraCharacteristics before opening the camera to check if it has the properties you require.
-                val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraDevice.id)
-
-                // The ScalerStreamConfigurationMap class is used to retrieve information about the available
-                // output foDrmats, sizes, and other properties for the streams that can be produced by the camera device.
-                // The camera device's stream configurations define the supported formats, sizes,
-                // and other parameters that can be used when capturing images or videos.
-                cameraCharacteristics[CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP]?.let { streamConfigurationMap ->
-                    streamConfigurationMap.getOutputSizes(ImageFormat.YUV_420_888)?.let { yuvSizes ->
-                        val previewSize = yuvSizes.last()
-                        val displayRotation = windowManager.defaultDisplay.rotation
-                        val swappedDimensions = areDimensionsSwapped(displayRotation, cameraCharacteristics)
-// swap width and height if needed
-                        val rotatedPreviewWidth = if (swappedDimensions) previewSize.height else previewSize.width
-                        val rotatedPreviewHeight = if (swappedDimensions) previewSize.width else previewSize.height
-                        surfaceView.holder.setFixedSize(rotatedPreviewWidth, rotatedPreviewHeight)
-
-                        val imageReader = ImageReader.newInstance(rotatedPreviewWidth, rotatedPreviewHeight,
-                            ImageFormat.YUV_420_888, 2)
-                        imageReader.setOnImageAvailableListener({
-                            imageReader.acquireLatestImage()?.let { image ->
-                                // process Image
-                                classifyImage(image);
-                                image.close()
-                            }
-                        }, Handler { true })
-
-                        val previewSurface = surfaceView.holder.surface
-                        val recordingSurface = imageReader.surface
-
-
-                        val captureCallback = object : CameraCaptureSession.StateCallback()
-                        {
-                            override fun onConfigureFailed(session: CameraCaptureSession) {}
-
-                            override fun onConfigured(session: CameraCaptureSession) {
-                                // session configured
-                                val previewRequestBuilder =   cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                                    .apply {
-                                        addTarget(previewSurface)
-                                        addTarget(recordingSurface)
-                                    }
-                                session.setRepeatingRequest(
-                                    previewRequestBuilder.build(),
-                                    object: CameraCaptureSession.CaptureCallback() {},
-                                    Handler { true }
-                                )
-                            }
-                        }
-                        cameraDevice.createCaptureSession(mutableListOf(previewSurface, recordingSurface), captureCallback, Handler { true })
-                    }
-
-                }
-            }
-        }, Handler { true })
-
-
-    }
-
-    private fun classifyImage(rawImage: Image) {
-        Log.d("classifyImage", "Classifying image")
-        Log.d("classifyImage", "Preprocessing the image...")
-        val image = Bitmap.createBitmap(rawImage.width, rawImage.height, Bitmap.Config.ALPHA_8)
-        image.copyPixelsFromBuffer(rawImage.planes[0].buffer)
-
-        try {
-            // Creates inputs for reference.
-            val inputFeature0 =
-                TensorBuffer.createFixedSize(intArrayOf(1, 224, 224, 3), DataType.FLOAT32)
-            val byteBuffer = ByteBuffer.allocateDirect(4 * imageSize * imageSize * 3)
-            byteBuffer.order(ByteOrder.nativeOrder())
-            val intValues = IntArray(imageSize * imageSize)
-            image.getPixels(intValues, 0, image.width, 0, 0, image.width, image.height)
-            var pixel = 0
-            //iterate over each pixel and extract R, G, and B values. Add those values individually to the byte buffer.
-            for (i in 0 until imageSize) {
-                for (j in 0 until imageSize) {
-                    val `val` = intValues[pixel++] // RGB
-                    byteBuffer.putFloat((`val` shr 16 and 0xFF) * (1f / 255))
-                    byteBuffer.putFloat((`val` shr 8 and 0xFF) * (1f / 255))
-                    byteBuffer.putFloat((`val` and 0xFF) * (1f / 255))
-                }
-            }
-            inputFeature0.loadBuffer(byteBuffer)
-
-            // Runs model inference and gets result.
-            val outputs: PersonalTrainerModel.Outputs = model.process(inputFeature0)
-            val outputFeature0: TensorBuffer = outputs.outputFeature0AsTensorBuffer
-            val confidences = outputFeature0.floatArray
-            // find the index of the class with the biggest confidence.
-            var maxPos = 0
-            var maxConfidence = 0f
-            for (i in confidences.indices) {
-                Log.d("confidence", "" + i)
-
-                if (confidences[i] > maxConfidence) {
-                    maxConfidence = confidences[i]
-                    maxPos = i
-
-                }
-            }
-            val classes = arrayOf("down", "up")
-            Log.d("Classifying image", "" + classes[maxPos] + " with confidence: " + confidences[maxPos])
-
-            // Releases model resources if no longer used.
-            //model.close()
-        } catch (e: IOException) {
-            // TODO Handle the exception
-        }
-
-    }
-
-    // We need to check if the orientation of the Android device and the orientation of the data being output by the camera, are swapped! It is possible that the device is oriented portrait,
- // but the camera is still outputting images which are oriented landscape according to the camera sensors.
-    private fun areDimensionsSwapped(displayRotation: Int, cameraCharacteristics: CameraCharacteristics): Boolean {
-        var swappedDimensions = false
-        when (displayRotation) {
-            Surface.ROTATION_0, Surface.ROTATION_180 -> {
-                if (cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) == 90 || cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) == 270) {
-                    swappedDimensions = true
-                }
-            }
-            Surface.ROTATION_90, Surface.ROTATION_270 -> {
-                if (cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) == 0 || cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) == 180) {
-                    swappedDimensions = true
-                }
-            }
-            else -> {
-                // invalid display rotation
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (allPermissionsGranted()) {
+                startCamera()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Permissions not granted by the user.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                finish()
             }
         }
-        return swappedDimensions
     }
 
+
+    private class FrameAnalyzer(private val classifier: Classifier) : ImageAnalysis.Analyzer {
+
+        private fun ByteBuffer.toByteArray(): ByteArray {
+            rewind()    // Rewind the buffer to zero
+            val data = ByteArray(remaining())
+            get(data)   // Copy the buffer into a byte array
+            return data // Return the byte array
+        }
+
+
+
+        override fun analyze(image: ImageProxy) {
+            Log.d("classifyingImage", "Got a frame")
+            classifier.classify(image)
+            image.close()
+
+        }
+    }
 }
+
+typealias LumaListener = (luma: Double) -> Unit
