@@ -1,10 +1,8 @@
 package com.example.personal_trainer
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.pm.PackageManager
-import android.media.Image
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -18,33 +16,35 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.personal_trainer.databinding.CameraActivityBinding
-import com.example.personal_trainer.ml.PersonalTrainerModel
-import java.nio.ByteBuffer
+import com.example.personal_trainer.classifier.AbstractStageClassifier
+import com.example.personal_trainer.classifier.FrameClassifier
+import com.example.personal_trainer.databinding.ActivityCameraBinding
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.log
 
-class CameraActivity : AppCompatActivity() {
+class CameraActivity() : AppCompatActivity() {
     // viewBinding = the whole layout
-    private lateinit var viewBinding: CameraActivityBinding
-    lateinit var model: PersonalTrainerModel
+    private lateinit var viewBinding: ActivityCameraBinding
     private var imageCapture: ImageCapture? = null
-
+    private lateinit var classifier: AbstractStageClassifier
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
-    private lateinit var classifier: Classifier
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewBinding = CameraActivityBinding.inflate(layoutInflater)
+        viewBinding = ActivityCameraBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
+        //get data from intent
+        val intent = intent
+        val exerciseCode = intent.getIntExtra("exercise", 0)
+        Log.d("exerciseCode", "Coder $exerciseCode")
+        classifier = ApplicationUtils.initializeClassifier(exerciseCode, applicationContext)
 
-        // Request camera permissions
         if (allPermissionsGranted()) {
-            model = PersonalTrainerModel.newInstance(applicationContext)
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
@@ -53,11 +53,9 @@ class CameraActivity : AppCompatActivity() {
         }
 
         // Set up the listeners for take photo and video capture buttons
-
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
         viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
         cameraExecutor = Executors.newSingleThreadExecutor()
-        classifier = Classifier(applicationContext)
     }
 
     private fun takePhoto() {
@@ -108,7 +106,6 @@ class CameraActivity : AppCompatActivity() {
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-
         cameraProviderFuture.addListener({
             // Used to bind the lifecycle of cameras to the lifecycle owner
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
@@ -122,10 +119,11 @@ class CameraActivity : AppCompatActivity() {
                 }
             //A use case for taking a picture.
             imageCapture = ImageCapture.Builder().build()
+
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, FrameAnalyzer(classifier))
+                    it.setAnalyzer(cameraExecutor, FrameClassifier(classifier))
                 }
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -191,26 +189,5 @@ class CameraActivity : AppCompatActivity() {
             }
         }
     }
-
-
-    private class FrameAnalyzer(private val classifier: Classifier) : ImageAnalysis.Analyzer {
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind()    // Rewind the buffer to zero
-            val data = ByteArray(remaining())
-            get(data)   // Copy the buffer into a byte array
-            return data // Return the byte array
-        }
-
-
-
-        override fun analyze(image: ImageProxy) {
-            Log.d("classifyingImage", "Got a frame")
-            classifier.classify(image)
-            image.close()
-
-        }
-    }
 }
 
-typealias LumaListener = (luma: Double) -> Unit
