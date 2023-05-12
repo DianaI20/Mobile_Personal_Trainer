@@ -1,10 +1,10 @@
-package com.example.personal_trainer.service
+package com.example.personal_trainer.helper
 
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.util.Log
-import com.example.personal_trainer.CameraActivity
+import com.example.personal_trainer.activity.CameraActivity
 
 class ModelSelectorHelper(private val context: Context, private var position: Int) {
 

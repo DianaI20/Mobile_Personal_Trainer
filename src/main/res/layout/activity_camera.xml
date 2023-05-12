@@ -1,35 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".CameraActivity">
+    tools:context=".activity.CameraActivity">
 
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.5">
+
+
+    </androidx.camera.view.PreviewView>
+
+    <include
+        android:id="@+id/countdownTimer"
+        layout="@layout/timer" />
+
+    <TextView
+        android:id="@+id/numberOfReps"
+        android:layout_width="403dp"
+        android:layout_height="57dp"
+        android:background="@color/white"
+        android:backgroundTint="#F1F0F0"
+        android:hapticFeedbackEnabled="true"
+        android:text="Number of reps: "
+        android:textColor="@color/black"
+        android:textSize="30dp" />
 
     <Button
         android:id="@+id/image_capture_button"
         android:layout_width="110dp"
         android:layout_height="110dp"
-        android:layout_marginBottom="50dp"
         android:layout_marginEnd="50dp"
+        android:layout_marginBottom="50dp"
         android:elevation="2dp"
         android:text="@string/take_photo"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/vertical_centerline" />
+        app:layout_constraintEnd_toStartOf="@id/vertical_centerline"
+        app:layout_constraintLeft_toLeftOf="parent" />
 
     <Button
         android:id="@+id/video_capture_button"
         android:layout_width="110dp"
         android:layout_height="110dp"
-        android:layout_marginBottom="50dp"
         android:layout_marginStart="50dp"
+        android:layout_marginBottom="50dp"
         android:elevation="2dp"
         android:text="@string/start_capture"
         app:layout_constraintBottom_toBottomOf="parent"

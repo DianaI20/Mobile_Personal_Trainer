@@ -1,4 +1,4 @@
-package com.example.personal_trainer
+package com.example.personal_trainer.activity
 
 import android.os.Bundle
 import android.util.Log
@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.personal_trainer.adapter.ExerciseViewAdapter
 import com.example.personal_trainer.databinding.ActivityExerciseMenuBinding
 import com.example.personal_trainer.model.Exercise
+import com.example.personal_trainer.utils.ApplicationUtils
 
 
 class ExerciseRecyclerViewList : AppCompatActivity() {
@@ -26,15 +27,17 @@ class ExerciseRecyclerViewList : AppCompatActivity() {
     private fun getExerciseListItems(): ArrayList<Exercise> {
         val exerciseListMenu = ArrayList<Exercise>()
 
-        for (i in ApplicationUtils.exerciseList) {
-            val imageName = (i + "_icon").toLowerCase()
+        for (exercise in ApplicationUtils.exerciseList) {
+            val imageName = (exercise.key + "_icon").toLowerCase()
             Log.d("imageName", "" + imageName)
             val image = ApplicationUtils.findDrawableResourceId(applicationContext, imageName)
+            val stages = exercise.value
             exerciseListMenu.add(
                 Exercise(
-                    i,
+                    exercise.key,
                     "TODO",
-                    image
+                    image,
+                    stages
                 )
             )
         }

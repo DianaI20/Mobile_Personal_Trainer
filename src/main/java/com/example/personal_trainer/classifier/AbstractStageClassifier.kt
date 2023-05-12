@@ -5,13 +5,13 @@ import android.graphics.Bitmap
 import android.media.Image
 import android.util.Log
 import androidx.camera.core.ImageProxy
-import com.example.personal_trainer.ApplicationUtils
+import com.example.personal_trainer.utils.ApplicationUtils
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-open class AbstractStageClassifier {
+abstract class AbstractStageClassifier {
 
     @SuppressLint("UnsafeOptInUsageError")
     fun transformImageFrameInTensorInput(imageProxy: ImageProxy): TensorBuffer {
@@ -53,9 +53,7 @@ open class AbstractStageClassifier {
         return inputFeature0;
     }
 
-    open fun classifyExerciseStage(imageProxy: ImageProxy): String {
-        TODO("Not yet implemented")
-    }
+     abstract fun classifyExerciseStage(imageProxy: ImageProxy): String ;
 
     var count = 0;
     fun getPredictionResultLabel(

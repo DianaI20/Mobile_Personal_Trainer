@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/loadingImage"
+        android:layout_width="323dp"
+        android:layout_height="319dp"
+        android:textAlignment="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.424"
+        app:srcCompat="@drawable/ic_loading_background" />
+
+    <TextView
+        android:id="@+id/secondsRemained"
+        android:layout_width="178dp"
+        android:layout_height="82dp"
+        android:background="@color/white"
+        android:backgroundTint="#F1F0F0"
+        android:hapticFeedbackEnabled="true"
+        android:text="05:00"
+        android:textAlignment="center"
+        android:textColor="@color/black"
+        android:textSize="60sp"
+        app:layout_constraintBottom_toBottomOf="@+id/loadingImage"
+        app:layout_constraintEnd_toEndOf="@+id/loadingImage"
+        app:layout_constraintStart_toStartOf="@+id/loadingImage"
+        app:layout_constraintTop_toTopOf="@+id/loadingImage" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

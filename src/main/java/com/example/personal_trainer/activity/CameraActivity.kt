@@ -1,12 +1,16 @@
-package com.example.personal_trainer
+package com.example.personal_trainer.activity
 
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -19,11 +23,11 @@ import androidx.core.content.ContextCompat
 import com.example.personal_trainer.classifier.AbstractStageClassifier
 import com.example.personal_trainer.classifier.FrameClassifier
 import com.example.personal_trainer.databinding.ActivityCameraBinding
+import com.example.personal_trainer.utils.ApplicationUtils
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.math.log
 
 class CameraActivity() : AppCompatActivity() {
     // viewBinding = the whole layout
@@ -33,6 +37,7 @@ class CameraActivity() : AppCompatActivity() {
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var timer: CountDownTimer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,9 +58,49 @@ class CameraActivity() : AppCompatActivity() {
         }
 
         // Set up the listeners for take photo and video capture buttons
+        viewBinding.videoCaptureButton.visibility = Button.GONE
+        viewBinding.imageCaptureButton.visibility = Button.GONE
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
         viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
         cameraExecutor = Executors.newSingleThreadExecutor()
+        initializeTimerBeforeExercise()
+    }
+
+    private fun initializeTimerBeforeExercise() {
+
+        viewBinding.countdownTimer.secondsRemained.visibility = TextView.VISIBLE
+
+        timer = object :
+            CountDownTimer(ApplicationUtils.noOfSecondsBeforeExercise.toLong() * 1000, 10) {
+            override fun onTick(millisUntilFinished: Long) {
+                viewBinding.countdownTimer.loadingImage.rotation += 1f
+                viewBinding.countdownTimer.secondsRemained.text =
+                    ApplicationUtils.convertMilisIntoText(millisUntilFinished)
+            }
+
+            override fun onFinish() {
+                hideTimerGraphics()
+                showControlButtons()
+                startCountingReps()
+            }
+        }
+    }
+
+    private fun startCountingReps() {
+       Log.d("countingReps", "Starting counting the number of reps...")
+
+
+    }
+
+    private fun hideTimerGraphics() {
+        viewBinding.countdownTimer.secondsRemained.visibility = TextView.GONE
+        viewBinding.countdownTimer.loadingImage.visibility = ImageView.GONE
+
+    }
+
+    private fun showControlButtons() {
+        viewBinding.videoCaptureButton.visibility = Button.VISIBLE
+        viewBinding.imageCaptureButton.visibility = Button.VISIBLE
     }
 
     private fun takePhoto() {
@@ -149,6 +194,16 @@ class CameraActivity() : AppCompatActivity() {
         ContextCompat.checkSelfPermission(
             baseContext, it
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onStart() {
+        super.onStart()
+        timer.start()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        timer.cancel()
     }
 
     override fun onDestroy() {

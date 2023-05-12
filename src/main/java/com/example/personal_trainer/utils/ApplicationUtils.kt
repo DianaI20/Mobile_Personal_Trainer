@@ -1,24 +1,32 @@
-package com.example.personal_trainer
+package com.example.personal_trainer.utils
 
 import android.content.Context
 import android.graphics.*
 import android.media.Image
 import android.util.Log
+import com.example.personal_trainer.R
 import com.example.personal_trainer.classifier.AbstractStageClassifier
 import com.example.personal_trainer.classifier.SquatStageClassifier
 import java.io.ByteArrayOutputStream
 
 object ApplicationUtils {
-    val exerciseList = arrayOf("Squat", "Push-up", "Split-squat")
+    val squatStages = listOf<String>("up", "down")
+    val pushupStages = listOf<String>("up", "down")
+    val exerciseList = hashMapOf(
+        "Squat" to squatStages,
+        "Pushup" to pushupStages
+    )
+    val stages = listOf(squatStages)
     val modelImageSize = 224
+    val noOfSecondsBeforeExercise = 5.0
 
-    fun findDrawableResourceId(context:Context, name:String): Int {
+    fun findDrawableResourceId(context: Context, name: String): Int {
         val uri = "@drawable/$name"
         var resourceId: Int = context.resources.getIdentifier(
             uri, "drawable",
             context.packageName
         )
-        if(resourceId == 0){
+        if (resourceId == 0) {
             Log.d("findDrawableResourceId", "Did not find resource for image with name: $name")
             resourceId = R.drawable.default_icon
 
@@ -47,9 +55,13 @@ object ApplicationUtils {
         return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
     }
 
-    fun initializeClassifier(exerciseCode: Int, applicationContext: Context): AbstractStageClassifier{
+    fun initializeClassifier(
+        exerciseCode: Int,
+        applicationContext: Context
+    ): AbstractStageClassifier {
         return when (exerciseCode) {
-            0 -> {Log.d("selection", "Squat was selected to be identified")
+            0 -> {
+                Log.d("selection", "Squat was selected to be identified")
                 SquatStageClassifier(applicationContext)
             }
             1 -> {
@@ -58,9 +70,16 @@ object ApplicationUtils {
             }
             else -> { // Note the block
                 // Do nothing
-                SquatStageClassifier(applicationContext);
+
+                throw ExceptionInInitializerError(
+                    "Error initializing the classifier"
+                )
             }
         }
+    }
 
+    fun convertMilisIntoText(milis: Long): String {
+        val seconds = milis / 1000
+        return "0$seconds"
     }
 }

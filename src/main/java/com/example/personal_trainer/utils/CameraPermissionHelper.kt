@@ -1,4 +1,4 @@
-package com.example.personal_trainer
+package com.example.personal_trainer.utils
 
 import android.app.Activity
 import android.content.Intent
@@ -17,7 +17,8 @@ object CameraPermissionHelper {
     }
     fun requestCameraPermission(activity: Activity) {
         ActivityCompat.requestPermissions(
-            activity, arrayOf(CAMERA_PERMISSION), CAMERA_PERMISSION_CODE)
+            activity, arrayOf(CAMERA_PERMISSION), CAMERA_PERMISSION_CODE
+        )
     }
     fun shouldShowRequestPermissionRationale(activity: Activity): Boolean {
         return ActivityCompat.shouldShowRequestPermissionRationale(activity, CAMERA_PERMISSION)

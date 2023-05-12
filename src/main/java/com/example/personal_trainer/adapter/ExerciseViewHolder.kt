@@ -8,7 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.personal_trainer.R
 import com.example.personal_trainer.model.Exercise
-import com.example.personal_trainer.service.ModelSelectorHelper
+import com.example.personal_trainer.helper.ModelSelectorHelper
 
 // Holds the views for adding it to image and text
 class ExerciseViewHolder(itemView: View, context: Context) :
