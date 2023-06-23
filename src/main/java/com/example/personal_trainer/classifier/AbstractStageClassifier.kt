@@ -11,7 +11,7 @@ import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-abstract class AbstractStageClassifier {
+abstract class AbstractStageClassifier(private val exerciseName: String) {
 
     @SuppressLint("UnsafeOptInUsageError")
     fun transformImageFrameInTensorInput(imageProxy: ImageProxy): TensorBuffer {
@@ -55,25 +55,23 @@ abstract class AbstractStageClassifier {
 
      abstract fun classifyExerciseStage(imageProxy: ImageProxy): String ;
 
-    var count = 0;
     fun getPredictionResultLabel(
-        labels: List<String>,
         outputFeature: TensorBuffer
     ): String {
+        val labels = ApplicationUtils.exerciseList[exerciseName]
         val probabilities = outputFeature.floatArray
         var maxIndex = 0
         var maxValue = probabilities[0]
+        Log.d("probability", "Up:"  + probabilities[0]);
+        Log.d("probability","Down" +  probabilities[1]);
+
         probabilities.withIndex().forEach {
             if (it.value > maxValue) {
                 maxValue = it.value
                 maxIndex = it.index
             }
         }
-        Log.d("label", labels[maxIndex])
-        if(labels[maxIndex] == "endPosition"){
-            count++
-            Log.d("label","" + count )
-        }
-        return labels[maxIndex]
+
+        return labels!!.get(maxIndex)
     }
 }

@@ -14,6 +14,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
+import androidx.camera.core.ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
@@ -95,7 +96,6 @@ class CameraActivity() : AppCompatActivity() {
     private fun hideTimerGraphics() {
         viewBinding.countdownTimer.secondsRemained.visibility = TextView.GONE
         viewBinding.countdownTimer.loadingImage.visibility = ImageView.GONE
-
     }
 
     private fun showControlButtons() {
@@ -165,13 +165,14 @@ class CameraActivity() : AppCompatActivity() {
             //A use case for taking a picture.
             imageCapture = ImageCapture.Builder().build()
 
+
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, FrameClassifier(classifier))
+                    it.setAnalyzer(cameraExecutor, FrameClassifier(classifier, viewBinding.numberOfReps))
                 }
             // Select back camera as a default
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
 
             try {
                 // Unbind use cases before rebinding

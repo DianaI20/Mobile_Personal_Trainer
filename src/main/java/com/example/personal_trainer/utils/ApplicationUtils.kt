@@ -10,10 +10,13 @@ import com.example.personal_trainer.classifier.SquatStageClassifier
 import java.io.ByteArrayOutputStream
 
 object ApplicationUtils {
+
+    val squat = "Squat"
+
     val squatStages = listOf<String>("up", "down")
     val pushupStages = listOf<String>("up", "down")
     val exerciseList = hashMapOf(
-        "Squat" to squatStages,
+        squat to squatStages,
         "Pushup" to pushupStages
     )
     val stages = listOf(squatStages)

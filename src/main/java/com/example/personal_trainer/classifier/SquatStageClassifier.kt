@@ -4,14 +4,14 @@ import android.content.Context
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.example.personal_trainer.ml.SquatClassifierModel
+import com.example.personal_trainer.utils.ApplicationUtils
 
 
 class SquatStageClassifier : AbstractStageClassifier {
 
     private val squatModelClassifier: SquatClassifierModel
-    val labels = listOf<String>("startPosition", "endPosition")
 
-    constructor(context: Context) {
+    constructor(context: Context) : super(ApplicationUtils.squat) {
         squatModelClassifier = context?.let { SquatClassifierModel.newInstance(it) }!!
     }
 
@@ -25,6 +25,6 @@ class SquatStageClassifier : AbstractStageClassifier {
 
         Log.d("squatClassifier", "Predicting the content of the current frame")
 
-        return getPredictionResultLabel(labels, outputs.outputFeature0AsTensorBuffer)
+        return getPredictionResultLabel(outputs.outputFeature0AsTensorBuffer)
     }
 }
